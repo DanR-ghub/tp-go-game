@@ -1,23 +1,24 @@
 package pl.edu.go.game;
 
 /**
- * Interfejs ObservableGame — "obserwowalna" gra.
+ * {@code ObservableGame} definiuje kontrakt gry publikującej zdarzenia do {@link GameObserver}.
  *
- * Wzorzec projektowy:
- * - Observer:
- *   - ObservableGame definiuje metody do rejestracji i wyrejestrowania
- *     obserwatorów stanu gry (GameObserver).
- *   - Konkretna implementacja (np. Game) powinna:
- *     * przechowywać listę GameObserver,
- *     * wywoływać ich metody przy każdej zmianie stanu (plansza, ruch, koniec gry).
- *
- * Rola interfejsu:
- * - oddziela "kontrakt" obserwowalnej gry od konkretnej klasy Game,
- * - pozwala w przyszłości podmienić implementację gry, zachowując ten sam interfejs
- *   dla obserwatorów (np. inna logika punktowania, różne zasady).
+ * <p><b>Wzorzec projektowy:</b> <b>Observer</b>.
+ * Implementacja (np. {@link Game}) przechowuje listę obserwatorów i powiadamia ich o zmianach stanu.
  */
-
 public interface ObservableGame {
+
+    /**
+     * Rejestruje obserwatora zdarzeń gry.
+     *
+     * @param observer obserwator do dodania
+     */
     void addObserver(GameObserver observer);
+
+    /**
+     * Usuwa wcześniej zarejestrowanego obserwatora.
+     *
+     * @param observer obserwator do usunięcia
+     */
     void removeObserver(GameObserver observer);
 }

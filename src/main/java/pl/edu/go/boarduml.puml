@@ -1,62 +1,114 @@
 @startuml
 skinparam classAttributeIconSize 0
-skinparam dpi 150
-title Diagram klas - Logika gry Go (Osoba A)
+skinparam dpi 160
+title Diagram klas - Go-Game (Iteracja 2) - TYLKO LOGIKA
 
-package board {
-    class Board {
-        - int size
-        - int[][] board
-        + Board(int size)
-        + boolean placeStone(int x, int y, int color)
-        + int get(int x, int y)
-        + void removeGroup(StoneGroup group)
-        + List<StoneGroup> findCapturedGroups(int x, int y, int color)
-        + List<int[]> neighbors(int x, int y)
-        + int countLiberties(StoneGroup group)
-    }
+package "pl.edu.go.board" as board {
 
-    class BoardFactory {
-        + Board createDefault19x19()
-        + Board create(int size)
-    }
+  enum Territory {
+    BLACK
+    WHITE
+    SEKI
+    NEUTRAL
+  }
+
+  class Board {
+    + EMPTY
+    + BLACK
+    + WHITE
+
+    - size
+    - board
+    - previousBoard
+
+    + Board(size)
+    + playMove(color, x, y)
+    + getState()
+    + inside(x, y)
+
+    - neighbors(x, y)
+    - getGroup(x, y)
+    - countLiberties(group)
+    - removeGroup(group)
+  }
+
+  class BoardFactory <<Factory Method>> {
+    + createBoard(size)
+  }
 }
 
-package model {
-    class Stone {
-        + int x
-        + int y
-        + int color
-    }
+package "pl.edu.go.model" as model {
 
-    class StoneGroup {
-        + addStone(Stone)
-        + List<Stone> getStones()
-    }
+  class Stone {
+    - x
+    - y
+    - color
+    + getX()
+    + getY()
+    + getColor()
+  }
+
+  class StoneGroup {
+    - color
+    - stones
+    + addStone(s)
+    + getStones()
+    + getColor()
+  }
 }
 
-package move {
-    class Move {
-        + int x
-        + int y
-        + int color
-        + Move(int x, int y, int color)
-    }
+package "pl.edu.go.move" as move {
 
-    class MoveAdapter {
-        + Move fromText(String cmd, int color)
-    }
+  class Move {
+    - color
+    - x
+    - y
+    + getColor()
+    + getX()
+    + getY()
+  }
 
-    class MoveFactory {
-        + Move createMove(int x, int y, int color)
-    }
+  class MoveFactory <<Factory Method>> {
+    + createMove(color, x, y)
+  }
+
+  class MoveAdapter <<Adapter>> {
+    + toInternal(moveText)
+    + toExternal(x, y)
+  }
 }
 
+package "pl.edu.go.analysis" as analysis {
 
-Board --> Stone : uses
-Board --> StoneGroup : creates groups
-StoneGroup --> Stone : contains\n(composite)
-MoveAdapter --> Move : adapts
-MoveFactory --> Move : creates
+  class PositionAnalyzer {
+    - board
+    + PositionAnalyzer(board)
+    + getDeadGroups()
+  }
+
+  class TerritoryAnalyzer {
+    - board
+    + TerritoryAnalyzer(board)
+    + computeTerritory()
+  }
+
+  class ScoreCalculator {
+    + computeScore(board)
+  }
+}
+
+board.Board --> model.Stone : uses
+board.Board --> model.StoneGroup : uses
+model.StoneGroup o-- "0..*" model.Stone : contains
+board.BoardFactory ..> board.Board : creates
+
+move.MoveFactory ..> move.Move : creates
+move.MoveAdapter ..> move.Move : adapts coords
+
+analysis.PositionAnalyzer --> board.Board : reads
+analysis.TerritoryAnalyzer --> board.Board : reads
+analysis.ScoreCalculator ..> analysis.PositionAnalyzer : uses
+analysis.ScoreCalculator ..> analysis.TerritoryAnalyzer : uses
+analysis.ScoreCalculator --> board.Board : reads
 
 @enduml

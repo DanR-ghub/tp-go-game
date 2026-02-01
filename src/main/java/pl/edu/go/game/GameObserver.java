@@ -1,26 +1,41 @@
 package pl.edu.go.game;
 
-/**
- * Interfejs GameObserver — obserwator stanu gry.
- *
- * Wzorzec projektowy:
- * - Observer:
- *   - GameObserver definiuje "kontrakt" dla obiektów, które chcą
- *     reagować na zmiany w Game (np. serwer, GUI, logger).
- *
- * Metody:
- * - onBoardChanged(Board board)         — plansza uległa zmianie,
- * - onGameEnded(GameResult result)      — gra się zakończyła,
- * - onPlayerToMoveChanged(PlayerColor)  — zmienił się gracz mający ruch.
- *
- * Implementacje:
- * - GameSession na serwerze — aktualizuje klientów po każdej zmianie gry.
- */
-
 import pl.edu.go.board.Board;
 
+/**
+ * {@code GameObserver} jest interfejsem obserwatora stanu gry.
+ *
+ * <p><b>Wzorzec projektowy:</b> <b>Observer</b>.
+ * Implementacje subskrybują zdarzenia z {@link pl.edu.go.game.Game}
+ * i reagują na zmiany (np. rozsyłając protokół do klientów).
+ */
 public interface GameObserver {
+
+    /**
+     * Zdarzenie: zmiana stanu planszy (np. po MOVE).
+     *
+     * @param board aktualna plansza gry
+     */
     void onBoardChanged(Board board);
+
+    /**
+     * Zdarzenie: zakończenie gry (RESIGN lub koniec po punktacji).
+     *
+     * @param result wynik gry
+     */
     void onGameEnded(GameResult result);
+
+    /**
+     * Zdarzenie: zmiana gracza na ruchu.
+     *
+     * @param player gracz, który ma wykonać następny ruch
+     */
     void onPlayerToMoveChanged(PlayerColor player);
+
+    /**
+     * Zdarzenie: zmiana fazy gry (PLAYING/SCORING_REVIEW/FINISHED).
+     *
+     * @param phase nowa faza gry
+     */
+    void onPhaseChanged(GamePhase phase);
 }

@@ -7,36 +7,78 @@ import pl.edu.go.game.PlayerColor;
 import pl.edu.go.server.ClientHandler;
 import pl.edu.go.server.GameSession;
 
-import java.util.ArrayList;
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.lang.reflect.Field;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Testy warstwy serwerowej (GameSession) bez użycia prawdziwych socketów.
+ *
+ * Uwaga: ClientHandler jest final, więc nie dziedziczymy po nim.
+ * Zamiast tego tworzymy normalny ClientHandler i wstrzykujemy mu PrintWriter przez refleksję.
  */
 public class GameSessionTest {
 
-    /**
-     * Prosty "fałszywy" klient: dziedziczy po ClientHandler
-     * i nadpisuje sendLine, żeby zbierać komunikaty w liście.
-     * Nie wywołujemy run(), więc socket może być null.
-     */
-    private static class TestClientHandler extends ClientHandler {
+    private static final class CapturingClient {
+        final ClientHandler handler;
+        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
-        private final List<String> sent = new ArrayList<>();
+        CapturingClient(GameSession session, PlayerColor color) {
+            // socket może być null – nie uruchamiamy run(), tylko chcemy przechwycić sendLine()
+            this.handler = new ClientHandler(null, session, color);
 
-        public TestClientHandler(GameSession session, PlayerColor color) {
-            super(null, session, color); // socket = null, nie używamy run()
+            PrintWriter pw = new PrintWriter(
+                    new OutputStreamWriter(baos, StandardCharsets.UTF_8),
+                    true
+            );
+            injectPrintWriter(handler, pw);
         }
 
-        @Override
-        public void sendLine(String line) {
-            sent.add(line);
+        void clear() {
+            baos.reset();
         }
 
-        public List<String> getSent() {
-            return sent;
+        List<String> lines() {
+            String raw = baos.toString(StandardCharsets.UTF_8);
+            return Arrays.stream(raw.split("\\R"))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .collect(Collectors.toList());
+        }
+
+        boolean containsExact(String line) {
+            return lines().stream().anyMatch(s -> s.equals(line));
+        }
+
+        boolean containsStartsWith(String prefix) {
+            return lines().stream().anyMatch(s -> s.startsWith(prefix));
+        }
+    }
+
+    private static void injectPrintWriter(ClientHandler h, PrintWriter pw) {
+        try {
+            // szukamy pola typu PrintWriter (nie zakładamy nazwy "out")
+            Field target = null;
+            for (Field f : ClientHandler.class.getDeclaredFields()) {
+                if (f.getType().equals(PrintWriter.class)) {
+                    target = f;
+                    break;
+                }
+            }
+            if (target == null) {
+                throw new IllegalStateException("ClientHandler has no PrintWriter field to inject.");
+            }
+            target.setAccessible(true);
+            target.set(h, pw);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to inject PrintWriter into ClientHandler: " + e.getMessage(), e);
         }
     }
 
@@ -46,41 +88,23 @@ public class GameSessionTest {
         Game game = new Game(board);
         GameSession session = new GameSession(game);
 
-        TestClientHandler black = new TestClientHandler(session, PlayerColor.BLACK);
-        TestClientHandler white = new TestClientHandler(session, PlayerColor.WHITE);
+        CapturingClient black = new CapturingClient(session, PlayerColor.BLACK);
+        CapturingClient white = new CapturingClient(session, PlayerColor.WHITE);
 
-        session.setPlayer(PlayerColor.BLACK, black);
-        session.setPlayer(PlayerColor.WHITE, white);
+        session.setPlayer(PlayerColor.BLACK, black.handler);
+        session.setPlayer(PlayerColor.WHITE, white.handler);
 
         session.startGame();
 
-        // BLACK
-        assertTrue(
-                black.getSent().contains("WELCOME BLACK"),
-                "BLACK powinien dostać WELCOME BLACK"
-        );
-        assertTrue(
-                black.getSent().contains("BOARD 5"),
-                "BLACK powinien dostać opis planszy BOARD 5"
-        );
-        assertTrue(
-                black.getSent().contains("TURN BLACK"),
-                "Na starcie gry ruch powinien mieć BLACK"
-        );
+        // minimalne asercje (bez uzależniania od INFO/PHASE)
+        assertTrue(black.containsExact("WELCOME BLACK"), "BLACK powinien dostać WELCOME BLACK");
+        assertTrue(white.containsExact("WELCOME WHITE"), "WHITE powinien dostać WELCOME WHITE");
 
-        // WHITE
-        assertTrue(
-                white.getSent().contains("WELCOME WHITE"),
-                "WHITE powinien dostać WELCOME WHITE"
-        );
-        assertTrue(
-                white.getSent().contains("BOARD 5"),
-                "WHITE powinien dostać opis planszy BOARD 5"
-        );
-        assertTrue(
-                white.getSent().contains("TURN BLACK"),
-                "WHITE też powinien widzieć, że ruch ma BLACK"
-        );
+        assertTrue(black.containsExact("BOARD 5"), "BLACK powinien dostać BOARD 5");
+        assertTrue(white.containsExact("BOARD 5"), "WHITE powinien dostać BOARD 5");
+
+        assertTrue(black.containsExact("TURN BLACK"), "Na starcie ruch powinien mieć BLACK (widok BLACK)");
+        assertTrue(white.containsExact("TURN BLACK"), "Na starcie ruch powinien mieć BLACK (widok WHITE)");
     }
 
     @Test
@@ -89,28 +113,21 @@ public class GameSessionTest {
         Game game = new Game(board);
         GameSession session = new GameSession(game);
 
-        TestClientHandler black = new TestClientHandler(session, PlayerColor.BLACK);
-        TestClientHandler white = new TestClientHandler(session, PlayerColor.WHITE);
+        CapturingClient black = new CapturingClient(session, PlayerColor.BLACK);
+        CapturingClient white = new CapturingClient(session, PlayerColor.WHITE);
 
-        session.setPlayer(PlayerColor.BLACK, black);
-        session.setPlayer(PlayerColor.WHITE, white);
+        session.setPlayer(PlayerColor.BLACK, black.handler);
+        session.setPlayer(PlayerColor.WHITE, white.handler);
 
         session.startGame();
-        black.getSent().clear();
-        white.getSent().clear();
+        black.clear();
+        white.clear();
 
         // BLACK wykonuje legalny ruch
-        session.handleClientMessage(black, "MOVE 2 2");
+        session.handleClientMessage(black.handler, "MOVE 2 2");
 
-        // powinna być zmiana gracza na WHITE
-        assertTrue(
-                black.getSent().contains("TURN WHITE"),
-                "Po legalnym ruchu BLACK ruch powinien przejść na WHITE (BLACK widzi TURN WHITE)"
-        );
-        assertTrue(
-                white.getSent().contains("TURN WHITE"),
-                "WHITE też powinien dostać TURN WHITE"
-        );
+        assertTrue(black.containsExact("TURN WHITE"), "Po ruchu BLACK tura powinna przejść na WHITE (widok BLACK)");
+        assertTrue(white.containsExact("TURN WHITE"), "Po ruchu BLACK tura powinna przejść na WHITE (widok WHITE)");
     }
 
     @Test
@@ -119,27 +136,27 @@ public class GameSessionTest {
         Game game = new Game(board);
         GameSession session = new GameSession(game);
 
-        TestClientHandler black = new TestClientHandler(session, PlayerColor.BLACK);
-        TestClientHandler white = new TestClientHandler(session, PlayerColor.WHITE);
+        CapturingClient black = new CapturingClient(session, PlayerColor.BLACK);
+        CapturingClient white = new CapturingClient(session, PlayerColor.WHITE);
 
-        session.setPlayer(PlayerColor.BLACK, black);
-        session.setPlayer(PlayerColor.WHITE, white);
+        session.setPlayer(PlayerColor.BLACK, black.handler);
+        session.setPlayer(PlayerColor.WHITE, white.handler);
 
         session.startGame();
-        black.getSent().clear();
-        white.getSent().clear();
+        black.clear();
+        white.clear();
 
         // BLACK wykonuje pierwszy, legalny ruch
-        session.handleClientMessage(black, "MOVE 2 2");
-        black.getSent().clear();
+        session.handleClientMessage(black.handler, "MOVE 2 2");
+        black.clear();
+        white.clear();
 
-        // Teraz jest tura WHITE, ale spróbujemy ruchem BLACK
-        session.handleClientMessage(black, "MOVE 1 1");
+        // Teraz jest tura WHITE, a próbujemy ruchem BLACK
+        session.handleClientMessage(black.handler, "MOVE 1 1");
 
-        boolean hasError = black.getSent().stream()
-                .anyMatch(s -> s.startsWith("ERROR"));
-
-        assertTrue(hasError,
-                "Jeśli BLACK próbuje ruszyć w turze WHITE, powinien dostać komunikat ERROR");
+        assertTrue(
+                black.containsStartsWith("ERROR"),
+                "Jeśli BLACK próbuje ruszyć w turze WHITE, powinien dostać ERROR"
+        );
     }
 }

@@ -1,12 +1,16 @@
 @startuml
 skinparam classAttributeIconSize 0
-skinparam dpi 150
-title Diagram klas - Go-Game (bez GUI) - klient CLI + serwer + logika
+skinparam dpi 160
+title Diagram klas - Go-Game (Iteracja 2) - serwer + logika + GUI + scoring/review
 
-' =======================
-'  pl.edu.go.board
-' =======================
 package "pl.edu.go.board" as board {
+
+  enum Territory {
+    BLACK
+    WHITE
+    SEKI
+    NEUTRAL
+  }
 
   class Board {
     + {static} int EMPTY
@@ -83,14 +87,49 @@ package "pl.edu.go.move" as move {
 }
 
 ' =======================
+'  pl.edu.go.analysis
+' =======================
+package "pl.edu.go.analysis" as analysis {
+
+  class PositionAnalyzer {
+    - pl.edu.go.board.Board board
+    + PositionAnalyzer(pl.edu.go.board.Board board)
+    + java.util.List<pl.edu.go.model.StoneGroup> getDeadGroups()
+  }
+
+  class TerritoryAnalyzer {
+    - pl.edu.go.board.Board board
+    + TerritoryAnalyzer(pl.edu.go.board.Board board)
+    + pl.edu.go.board.Territory[][] computeTerritory()
+  }
+
+  class ScoreCalculator {
+    + {static} int[] computeScore(pl.edu.go.board.Board board)
+  }
+}
+
+' =======================
 '  pl.edu.go.game
 ' =======================
 package "pl.edu.go.game" as game {
 
+  interface ObservableGame <<Subject (Observer)>> {
+    + void addObserver(GameObserver observer)
+    + void removeObserver(GameObserver observer)
+  }
+
   interface GameObserver <<Observer>> {
     + void onBoardChanged(pl.edu.go.board.Board board)
-    + void onGameEnded(GameResult result)
     + void onPlayerToMoveChanged(PlayerColor player)
+    + void onGameEnded(GameResult result)
+    ' (Jeśli masz onPhaseChanged w kodzie, dopisz tu tę linijkę:)
+    ' + void onPhaseChanged(GamePhase phase)
+  }
+
+  enum GamePhase {
+    PLAYING
+    SCORING_REVIEW
+    FINISHED
   }
 
   enum PlayerColor {
@@ -111,34 +150,37 @@ package "pl.edu.go.game" as game {
     + String getReason()
   }
 
-  class Game {
+  class Game implements ObservableGame {
     - pl.edu.go.board.Board board
     - PlayerColor currentPlayer
     - boolean finished
     - GameResult result
     - int consecutivePasses
     - java.util.List<GameObserver> observers
+    - GamePhase phase
 
     + Game(pl.edu.go.board.Board board)
     + pl.edu.go.board.Board getBoard()
     + PlayerColor getCurrentPlayer()
     + boolean isFinished()
-    + GameResult getResult()
+    ' getResult() jest opcjonalny (u Ciebie bywa usunięty); zostaw jako komentarz:
+    ' + GameResult getResult()
+    + GamePhase getPhase()
 
     + void addObserver(GameObserver observer)
     + void removeObserver(GameObserver observer)
 
-    ' Wariant "void + wyjątki" (wg Twoich ostatnich zmian).
     + void playMove(PlayerColor player, int x, int y)
+    + void playMove(pl.edu.go.move.Move move)
     + void pass(PlayerColor player)
     + void resign(PlayerColor player)
-
-    ' Jeśli masz również przeciążenie dla Move (zalecane przy Move/MoveFactory):
-    + void playMove(pl.edu.go.move.Move move)
+    + void agree(PlayerColor player)
+    + void resume(PlayerColor player)
 
     - void notifyBoardChanged()
     - void notifyPlayerToMoveChanged()
     - void notifyGameEnded()
+    - void notifyPhaseChanged()
   }
 }
 
@@ -168,6 +210,18 @@ package "pl.edu.go.command" as command {
   class ResignCommand <<Command>> {
     - pl.edu.go.game.PlayerColor player
     + ResignCommand(pl.edu.go.game.PlayerColor player)
+    + void execute(pl.edu.go.game.Game game)
+  }
+
+  class AgreeCommand <<Command>> {
+    - pl.edu.go.game.PlayerColor player
+    + AgreeCommand(pl.edu.go.game.PlayerColor player)
+    + void execute(pl.edu.go.game.Game game)
+  }
+
+  class ResumeCommand <<Command>> {
+    - pl.edu.go.game.PlayerColor player
+    + ResumeCommand(pl.edu.go.game.PlayerColor player)
     + void execute(pl.edu.go.game.Game game)
   }
 
@@ -212,6 +266,74 @@ package "pl.edu.go.server" as server {
     + void onBoardChanged(pl.edu.go.board.Board board)
     + void onGameEnded(pl.edu.go.game.GameResult result)
     + void onPlayerToMoveChanged(pl.edu.go.game.PlayerColor player)
+    ' (Jeśli masz onPhaseChanged, dopisz:)
+    ' + void onPhaseChanged(pl.edu.go.game.GamePhase phase)
+
+    - void sendScoreTerritoryAndDeadMask()
+  }
+}
+
+' =======================
+'  pl.edu.go.client.net
+' =======================
+package "pl.edu.go.client.net" as net {
+
+  class NetworkClient {
+    - java.net.Socket socket
+    - java.io.BufferedReader in
+    - java.io.PrintWriter out
+
+    + void connect(String host, int port)
+    + void disconnect()
+    + boolean isConnected()
+    + void sendLine(String line)
+
+    + void setOnLine(java.util.function.Consumer<String> onLine)
+    + void setOnError(java.util.function.Consumer<Throwable> onError)
+  }
+}
+
+' =======================
+'  pl.edu.go.client.gui
+' =======================
+package "pl.edu.go.client.gui" as gui {
+
+  class GuiClientApp <<MVC:App>> {
+    + void start(javafx.stage.Stage stage)
+    + void stop()
+    - void refreshUI()
+  }
+
+  class GameModel <<MVC:Model>> {
+    - int boardSize
+    - int[][] board
+    - pl.edu.go.game.PlayerColor myColor
+    - pl.edu.go.game.PlayerColor currentTurn
+    - pl.edu.go.game.GamePhase phase
+    - boolean finished
+    - String endMessage
+    - Integer scoreBlack
+    - Integer scoreWhite
+    - char[][] territoryMap
+    - boolean[][] deadMask
+
+    + void acceptServerLine(String line)
+    + boolean canPlayNow()
+    + boolean inReview()
+    + boolean showScoringOverlays()
+  }
+
+  class BoardView <<MVC:View>> {
+    + void redraw()
+    + void setClickHandler(IntersectionClickHandler clickHandler)
+  }
+
+  class GameController <<MVC:Controller>> {
+    + void onIntersectionClicked(int x, int y)
+    + void sendPass()
+    + void sendResign()
+    + void sendAgree()
+    + void sendResume()
   }
 }
 
@@ -219,17 +341,13 @@ package "pl.edu.go.server" as server {
 '  pl.edu.go.client.cli
 ' =======================
 package "pl.edu.go.client.cli" as cli {
-
   class CliClient {
-    - {static} volatile boolean running
     + {static} void main(String[] args)
-    - {static} void listenToServer(java.io.BufferedReader in)
-    - {static} void displayBoard(int size, java.util.List<String> rows)
   }
 }
 
 ' =======================
-'  (opcjonalnie) pl.edu.go - MainTest / testy
+'  pl.edu.go (root)
 ' =======================
 package "pl.edu.go" as root {
   class MainTest {
@@ -240,22 +358,32 @@ package "pl.edu.go" as root {
 ' =======================
 '  RELACJE: board/model
 ' =======================
-board.Board --> model.Stone : creates/uses
-board.Board --> model.StoneGroup : creates/uses
-model.StoneGroup o-- "0..*" model.Stone : contains (composite)
+board.Board --> model.Stone : uses
+board.Board --> model.StoneGroup : uses
+model.StoneGroup o-- "0..*" model.Stone : contains
 board.BoardFactory ..> board.Board : creates
 
 ' =======================
 '  RELACJE: move
 ' =======================
 move.MoveFactory ..> move.Move : creates
-move.MoveAdapter ..> move.Move : adapts coords (optional use)
+move.MoveAdapter ..> move.Move : adapts coords
+
+' =======================
+'  RELACJE: analysis
+' =======================
+analysis.PositionAnalyzer --> board.Board : reads
+analysis.TerritoryAnalyzer --> board.Board : reads
+analysis.ScoreCalculator ..> analysis.PositionAnalyzer : uses
+analysis.ScoreCalculator ..> analysis.TerritoryAnalyzer : uses
+analysis.ScoreCalculator --> board.Board : reads
 
 ' =======================
 '  RELACJE: game
 ' =======================
 game.Game --> board.Board : delegates rules
 game.Game o-- "0..*" game.GameObserver : notifies
+game.Game ..|> game.ObservableGame
 game.PlayerColor ..> board.Board : maps Board.BLACK/WHITE
 
 ' =======================
@@ -264,15 +392,21 @@ game.PlayerColor ..> board.Board : maps Board.BLACK/WHITE
 command.GameCommand <|.. command.PlaceStoneCommand
 command.GameCommand <|.. command.PassCommand
 command.GameCommand <|.. command.ResignCommand
+command.GameCommand <|.. command.AgreeCommand
+command.GameCommand <|.. command.ResumeCommand
 
 command.TextCommandFactory ..> command.GameCommand : creates
 command.TextCommandFactory ..> command.PlaceStoneCommand : creates
 command.TextCommandFactory ..> command.PassCommand : creates
 command.TextCommandFactory ..> command.ResignCommand : creates
+command.TextCommandFactory ..> command.AgreeCommand : creates
+command.TextCommandFactory ..> command.ResumeCommand : creates
 
 command.PlaceStoneCommand --> game.Game : execute()
 command.PassCommand --> game.Game : execute()
 command.ResignCommand --> game.Game : execute()
+command.AgreeCommand --> game.Game : execute()
+command.ResumeCommand --> game.Game : execute()
 
 ' =======================
 '  RELACJE: server
@@ -282,6 +416,10 @@ server.GameSession --> game.Game : owns
 server.GameSession --> command.TextCommandFactory : uses
 server.GameSession --> server.ClientHandler : holds players
 
+server.GameSession ..> analysis.ScoreCalculator : uses (scoring)
+server.GameSession ..> analysis.TerritoryAnalyzer : uses (map)
+server.GameSession ..> analysis.PositionAnalyzer : uses (dead stones)
+
 server.ClientHandler --> server.GameSession : forwards messages
 server.ClientHandler --> game.PlayerColor : assigned color
 
@@ -289,13 +427,21 @@ server.GameServer ..> board.BoardFactory : creates board
 server.GameServer ..> game.Game : creates
 server.GameServer ..> server.GameSession : creates
 server.GameServer ..> server.ClientHandler : creates + threads
-server.GameServer ..> java.net.ServerSocket : opens port 5001
+server.GameServer ..> java.net.ServerSocket : opens port
 
 ' =======================
-'  RELACJE: client CLI
+'  RELACJE: GUI (MVC)
 ' =======================
-cli.CliClient ..> move.MoveAdapter : parses MOVE (B2/B 2)
-root.MainTest ..> board.Board
-root.MainTest ..> move.MoveAdapter
+gui.GuiClientApp --> net.NetworkClient : owns
+gui.GuiClientApp --> gui.GameModel : owns
+gui.GuiClientApp --> gui.GameController : owns
+gui.GuiClientApp --> gui.BoardView : owns
+
+gui.GameController --> net.NetworkClient : sends commands
+gui.GameController --> gui.GameModel : checks state
+
+gui.BoardView --> gui.GameModel : renders state
+gui.GameModel ..> game.PlayerColor : stores
+gui.GameModel ..> game.GamePhase : stores
 
 @enduml

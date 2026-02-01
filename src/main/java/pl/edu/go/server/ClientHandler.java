@@ -4,36 +4,35 @@ import pl.edu.go.game.PlayerColor;
 
 import java.io.*;
 import java.net.Socket;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
- * Klasa ClientHandler — obsługa pojedynczego klienta po stronie serwera.
+ * {@code ClientHandler} obsługuje pojedyncze połączenie TCP klienta (socket I/O).
  *
- * Rola klasy:
- * - opakowuje gniazdo sieciowe (Socket) jednego gracza,
- * - w osobnym wątku:
- *   * czyta linie tekstu od klienta,
- *   * przekazuje je do GameSession.handleClientMessage(...),
- * - udostępnia metodę sendLine(...) do wysyłania komunikatów do klienta,
- * - pamięta przypisany kolor gracza (BLACK lub WHITE).
+ * <p><b>Architektura:</b> warstwa transportowa (Layered Architecture).
+ * Klasa odpowiada wyłącznie za komunikację: czytanie linii i wysyłanie odpowiedzi.
  *
- * Wzorce:
- * - nie realizuje konkretnego wzorca GoF, ale współpracuje z:
- *   * Command (GameCommand wykonywane w GameSession),
- *   * Observer (GameSession jako GameObserver reaguje na zmiany w Game).
+ * <p><b>Wzorzec projektowy:</b>
+ * <ul>
+ *   <li><b>Reactor/Handler</b> (idiom serwerów sieciowych) — obiekt-hendler odpowiedzialny
+ *       za obsługę jednego klienta i przekazywanie danych do warstwy aplikacyjnej
+ *       ({@link pl.edu.go.server.GameSession}).</li>
+ * </ul>
+ *
+ * <p>Klasa nie zawiera reguł gry; logika pozostaje w {@code Game}.
  */
-public class ClientHandler implements Runnable {
+public final class ClientHandler implements Runnable {
 
-    // gniazdo TCP dla tego klienta
     private final Socket socket;
-
-    // referencja do sesji gry, której ten klient jest częścią
     private final GameSession session;
-
-    // kolor gracza (BLACK / WHITE)
     private final PlayerColor color;
 
-    // strumień wyjściowy do klienta, ustawiany w run()
-    private PrintWriter out;
+    // Ustawiane dopiero po starcie run()
+    private volatile PrintWriter out;
+
+    // Sygnał „gotowości” (czy out jest ustawione i można wysyłać)
+    private final CountDownLatch readyLatch = new CountDownLatch(1);
 
     public ClientHandler(Socket socket, GameSession session, PlayerColor color) {
         this.socket = socket;
@@ -42,55 +41,81 @@ public class ClientHandler implements Runnable {
     }
 
     /**
-     * Zwraca kolor przypisany temu klientowi (BLACK/WHITE).
+     * Zwraca kolor przypisany do tego połączenia (BLACK/WHITE).
+     *
+     * @return kolor klienta
      */
     public PlayerColor getColor() {
         return color;
     }
 
     /**
-     * Wysyła pojedynczą linię tekstu do klienta.
-     * Jeśli out nie jest jeszcze ustawiony (np. przed startem run),
-     * metoda nic nie zrobi.
+     * Czeka aż handler przygotuje strumień wyjściowy ({@code out}).
+     * Dzięki temu serwer może bezpiecznie wysłać komunikaty startowe (np. WELCOME/INFO)
+     * bez ryzyka, że {@code out == null}.
+     *
+     * @param timeoutMs maksymalny czas oczekiwania w ms
+     * @return {@code true} jeśli handler jest gotowy do wysyłania
      */
-    public void sendLine(String line) {
-        if (out != null) {
-            out.println(line);
-            out.flush();
+    public boolean awaitReady(long timeoutMs) {
+        try {
+            return readyLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    /**
+     * Wysyła jedną linię tekstu do klienta.
+     *
+     * <p>Jeżeli {@code out} nie jest jeszcze ustawione, metoda nic nie wysyła.
+     * W praktyce serwer powinien wcześniej użyć {@link #awaitReady(long)}.</p>
+     *
+     * @param line linia do wysłania (bez '\n')
+     */
+    void sendLine(String line) {
+        PrintWriter w = out;
+        if (w != null) {
+            w.println(line);
+            w.flush();
         }
     }
 
     /**
      * Główna pętla wątku klienta:
-     * - tworzy strumienie wejścia/wyjścia,
-     * - wysyła powitalne INFO,
-     * - czyta linie od klienta i przekazuje je do GameSession,
-     * - kończy działanie po zamknięciu połączenia lub błędzie.
+     * <ul>
+     *   <li>tworzy strumienie wejścia/wyjścia,</li>
+     *   <li>ustawia {@code out} i sygnalizuje gotowość,</li>
+     *   <li>wysyła komunikat INFO po połączeniu,</li>
+     *   <li>czyta linie od klienta i przekazuje je do {@link GameSession}.</li>
+     * </ul>
      */
     @Override
     public void run() {
         try (
-                BufferedReader in = new BufferedReader(
-                        new InputStreamReader(socket.getInputStream()));
-                PrintWriter writer = new PrintWriter(
-                        new OutputStreamWriter(socket.getOutputStream()), true)
+                BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                PrintWriter writer = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()), true)
         ) {
             // ustawiamy strumień wyjściowy, którego używa sendLine(...)
             this.out = writer;
+            // sygnał gotowości do wysyłania
+            readyLatch.countDown();
 
             // prosty komunikat informacyjny po połączeniu
             sendLine("INFO Connected as " + color.name());
 
             String line;
-            // czytamy kolejne linie dopóki klient nie zamknie połączenia (readLine() == null)
             while ((line = in.readLine()) != null) {
-                // przekazujemy wiadomość do GameSession
                 session.handleClientMessage(this, line);
             }
 
             System.out.println("Client " + color + " disconnected (EOF).");
         } catch (IOException e) {
             System.out.println("Client " + color + " disconnected: " + e.getMessage());
+        } finally {
+            // na wypadek gdyby wyjątek był przed ustawieniem out
+            readyLatch.countDown();
         }
     }
 }

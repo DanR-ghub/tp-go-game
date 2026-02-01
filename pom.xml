@@ -1,7 +1,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-         https://maven.apache.org/xsd/maven-4.0.0.xsd">
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
     <modelVersion>4.0.0</modelVersion>
 
@@ -10,22 +10,32 @@
     <version>1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
-    <name>Go Game Logic (Iteration 1)</name>
+    <name>Go Game (Iteration 2)</name>
 
     <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <javafx.version>17.0.10</javafx.version>
     </properties>
 
     <dependencies>
-        <!-- JUnit 5 do testów jednostkowych -->
+
+        <!-- JUnit 5 -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <version>5.10.2</version>
             <scope>test</scope>
         </dependency>
+
+        <!-- JavaFX -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
+
     </dependencies>
 
     <build>
@@ -42,17 +52,7 @@
                 </configuration>
             </plugin>
 
-            <!-- Uruchamianie programu -->
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <version>3.1.0</version>
-                <configuration>
-                    <mainClass>pl.edu.go.MainTest</mainClass>
-                </configuration>
-            </plugin>
-
-            <!-- Testy (JUnit 5) -->
+            <!-- JUnit 5 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
@@ -84,25 +84,81 @@
                 </configuration>
             </plugin>
 
-            <!-- PMD -->
+            <!-- Exec plugin -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+
+                    <execution>
+                        <id>server</id>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>pl.edu.go.server.GameServer</mainClass>
+                        </configuration>
+                    </execution>
+
+                    <execution>
+                        <id>maintest</id>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>pl.edu.go.MainTest</mainClass>
+                        </configuration>
+                    </execution>
+
+                </executions>
+            </plugin>
+
+            <!-- JavaFX -->
+            <plugin>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-maven-plugin</artifactId>
+                <version>0.0.8</version>
+                <configuration>
+                    <mainClass>pl.edu.go.client.gui.GuiClientApp</mainClass>
+                </configuration>
+            </plugin>
+
+            <!-- JavaDoc -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-pmd-plugin</artifactId>
-                <version>3.21.2</version>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>3.6.3</version>
+
+                <configuration>
+                    <encoding>${project.build.sourceEncoding}</encoding>
+                    <docencoding>${project.build.sourceEncoding}</docencoding>
+                    <charset>${project.build.sourceEncoding}</charset>
+
+                    <doclint>none</doclint>
+                    <failOnError>false</failOnError>
+                    <show>protected</show>
+                </configuration>
+
                 <executions>
+
+                    <!-- mvn javadoc:javadoc -->
                     <execution>
-                        <id>pmd</id>
-                        <phase>validate</phase>
+                        <id>generate-javadoc</id>
                         <goals>
-                            <goal>check</goal>
+                            <goal>javadoc</goal>
                         </goals>
                     </execution>
+
+                    <!-- mvn package -> javadoc.jar -->
+                    <execution>
+                        <id>attach-javadocs</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+
                 </executions>
-                <configuration>
-                    <targetJdk>17</targetJdk>
-                    <printFailingErrors>true</printFailingErrors>
-                    <failOnViolation>false</failOnViolation>
-                </configuration>
             </plugin>
 
         </plugins>

@@ -1,13 +1,21 @@
 package pl.edu.go.board;
 
 /**
- * Wzorzec: Factory Method
- * -------------------------
- * Tworzy obiekt Board.
- * Ułatwia zmianę sposobu tworzenia planszy w przyszłości
- * (np. różne warianty, tryby testowe, rozmiary).
+ * Fabryka tworząca obiekty planszy gry Go.
+ *
+ * <p>
+ * Uproszczona implementacja wzorca projektowego
+ * Factory Method, umożliwiająca łatwą zmianę
+ * sposobu tworzenia planszy w przyszłości.
  */
 public class BoardFactory {
+
+    /**
+     * Tworzy nową planszę gry Go o podanym rozmiarze.
+     *
+     * @param size rozmiar planszy
+     * @return nowy obiekt {@link Board}
+     */
     public static Board createBoard(int size) {
         return new Board(size);
     }

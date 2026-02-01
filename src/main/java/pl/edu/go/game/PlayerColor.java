@@ -1,36 +1,49 @@
 package pl.edu.go.game;
 
-/**
- * Enum PlayerColor — kolor gracza (BLACK lub WHITE).
- *
- * Rola klasy:
- * - reprezentuje kolor na poziomie logiki gry (Game),
- * - udostępnia metodę opposite() do zmiany aktualnego gracza,
- * - mapuje na wartości int używane przez Board (toBoardColor / fromBoardColor),
- *   dzięki czemu logika gry nie musi znać stałych Board.BLACK/WHITE bezpośrednio.
- */
-
 import pl.edu.go.board.Board;
 
+/**
+ * {@code PlayerColor} reprezentuje kolor gracza (BLACK/WHITE) oraz operacje pomocnicze
+ * (np. zamiana na przeciwnika).
+ *
+ * <p>Enum jest używany w logice gry oraz w protokole komunikacji klient–serwer.
+ */
 public enum PlayerColor {
     BLACK(Board.BLACK),
     WHITE(Board.WHITE);
 
+    /** Kolor w reprezentacji używanej przez {@link Board}. */
     private final int boardColor;
 
     PlayerColor(int boardColor) {
         this.boardColor = boardColor;
     }
 
-    /** Kolor w postaci int-a używanego przez Board (Board.BLACK / Board.WHITE). */
+    /**
+     * Zwraca kolor w postaci {@code int} używanej przez {@link Board} (Board.BLACK / Board.WHITE).
+     *
+     * @return kolor w formacie planszy
+     */
     public int toBoardColor() {
         return boardColor;
     }
 
+    /**
+     * Zwraca przeciwnika (BLACK ↔ WHITE).
+     *
+     * @return kolor przeciwnika
+     */
     public PlayerColor opposite() {
         return this == BLACK ? WHITE : BLACK;
     }
 
+    /**
+     * Mapuje kolor z {@link Board} na {@link PlayerColor}.
+     *
+     * @param color kolor w formacie planszy
+     * @return odpowiadający {@link PlayerColor}
+     * @throws IllegalArgumentException gdy {@code color} nie oznacza koloru kamienia
+     */
     public static PlayerColor fromBoardColor(int color) {
         return switch (color) {
             case Board.BLACK -> BLACK;
