@@ -1,18 +1,21 @@
-# Go Game – Iteracja 2 (klient–serwer + GUI + scoring)
+# Go Game (TP) — Iteracja 3
 
-Projekt zaliczeniowy z laboratorium – uproszczona gra **Go** w architekturze **klient–serwer**.
+Uproszczona gra **Go** w architekturze **klient–serwer**. Projekt zawiera interfejs **CLI** oraz **GUI (JavaFX)**, obsługuje rozgrywkę dwóch graczy, boty po stronie serwera oraz zapis/odtwarzanie rozgrywek z bazy danych.
 
-* logika gry i walidacja ruchów po stronie serwera (`Board` + `Game`),
-* dwaj klienci łączą się do serwera i grają przeciwko sobie,
-* dostępne interfejsy:
-
-  * **CLI** (terminal),
-  * **GUI** (JavaFX),
-* projekt zrealizowany w **Javie 17** z użyciem **Mavena**.
+## Najważniejsze funkcje
+- **Klient–serwer**: serwer utrzymuje stan gry i waliduje ruchy
+- **Dwóch graczy** łączy się do serwera i gra w czasie rzeczywistym
+- **Interfejsy**:
+  - CLI (terminal)
+  - GUI (JavaFX)
+- **Boty serwerowe**: możliwość dołączenia bota jako przeciwnika (lub uzupełnienia brakującego gracza)
+- **Baza danych (Spring)**:
+  - zapis gier i ruchów
+  - **replay** — odtwarzanie partii na podstawie danych z DB
 
 ---
 
-## 1. Funkcjonalność (Iteracja 2)
+## 1. Funkcjonalność
 
 ### 1.1. Rozgrywka
 
@@ -226,69 +229,7 @@ Interpretacja:
 
 ---
 
-## 7. Struktura pakietów
-
-```text
-pl.edu.go.board
-    Board
-    BoardFactory
-    Territory
-
-pl.edu.go.model
-    Stone
-    StoneGroup
-
-pl.edu.go.move
-    Move
-    MoveAdapter
-    MoveFactory
-
-pl.edu.go.analysis
-    PositionAnalyzer
-    TerritoryAnalyzer
-    ScoreCalculator
-
-pl.edu.go.game
-    Game
-    ObservableGame
-    GameObserver
-    GamePhase
-    GameResult
-    PlayerColor
-
-pl.edu.go.command
-    GameCommand
-    PlaceStoneCommand
-    PassCommand
-    ResignCommand
-    AgreeCommand
-    ResumeCommand
-    TextCommandFactory
-
-pl.edu.go.server
-    GameServer
-    GameSession
-    ClientHandler
-
-pl.edu.go.client.net
-    NetworkClient
-
-pl.edu.go.client.gui
-    GuiClientApp
-    GameModel
-    GameController
-    BoardView
-
-pl.edu.go.client.cli
-    CliClient
-
-pl.edu.go
-    MainTest
-```
-
----
-
-## 8. Wzorce projektowe i architektura
+## 7. Wzorce projektowe i architektura
 
 * **Client–Server**: `GameServer` + klienci (CLI/GUI)
 * **Layered Architecture**:
@@ -312,9 +253,9 @@ pl.edu.go
 
 ---
 
-## 9. Dokumentacja i UML
+## 8. Dokumentacja i UML
 
-### 9.1. Javadoc
+### 8.1. Javadoc
 
 Generowanie:
 
@@ -328,7 +269,7 @@ Podgląd:
 xdg-open target/site/apidocs/index.html
 ```
 
-### 9.2. UML (PlantUML)
+### 8.2. UML (PlantUML)
 
 Plik:
 
@@ -343,7 +284,7 @@ xdg-open src/main/java/pl/edu/go/all.png
 
 ---
 
-## 10. Uruchamianie w skrócie
+## 9. Uruchamianie w skrócie
 
 1. Kompilacja:
 
@@ -351,10 +292,14 @@ xdg-open src/main/java/pl/edu/go/all.png
 mvn clean compile
 ```
 
-2. Serwer:
+2. Serwer (2 z historią ruchów):
 
 ```bash
 mvn -q exec:java@server
+
+lub 
+
+mvn -q exec:java@server-spring
 ```
 
 3. Klienci (CLI lub GUI):
@@ -369,3 +314,9 @@ mvn javafx:run
 
 4. Gra:
    `MOVE ...`, `PASS`, `RESIGN`, a w `SCORING_REVIEW`: `AGREE` / `RESUME`.
+
+5. Replay: (odtwarzanie gry z DB)
+Uruchomienie replay
+```bash
+mvn -q exec:java@replay -Dexec.args="--go.mode=replay --go.replay.gameId = WPISZ ID GRY Z TERMINALA"
+```

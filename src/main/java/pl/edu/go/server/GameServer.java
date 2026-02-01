@@ -12,23 +12,30 @@ import java.net.Socket;
 /**
  * {@code GameServer} uruchamia serwer TCP dla gry Go.
  *
- * <p><b>Architektura:</b> Client–Server.
- * {@code GameServer} inicjalizuje warstwę transportową (socket), tworzy sesję gry
- * ({@link pl.edu.go.server.GameSession}) i przypisuje łączących się klientów do kolorów.
+ * <p>
+ * <b>Architektura:</b> Client–Server.
+ * {@code GameServer} inicjalizuje warstwę transportową (socket), tworzy sesję
+ * gry
+ * ({@link pl.edu.go.server.GameSession}) i przypisuje łączących się klientów do
+ * kolorów.
  *
- * <p>Klasa nie implementuje reguł gry ani punktacji; odpowiada za bootstrap i cykl życia serwera.
+ * <p>
+ * Klasa nie implementuje reguł gry ani punktacji; odpowiada za bootstrap i cykl
+ * życia serwera.
  */
 public final class GameServer {
 
     /**
      * Punkt wejścia serwera.
      *
-     * <p>Flow:
+     * <p>
+     * Flow:
      * <ol>
-     *   <li>tworzy {@link Board} i {@link Game},</li>
-     *   <li>tworzy {@link GameSession} spinającą warstwę sieciową z logiką gry,</li>
-     *   <li>akceptuje dwóch klientów i przypisuje im kolory (BLACK, potem WHITE),</li>
-     *   <li>uruchamia wątki {@link ClientHandler} i startuje grę.</li>
+     * <li>tworzy {@link Board} i {@link Game},</li>
+     * <li>tworzy {@link GameSession} spinającą warstwę sieciową z logiką gry,</li>
+     * <li>akceptuje dwóch klientów i przypisuje im kolory (BLACK, potem
+     * WHITE),</li>
+     * <li>uruchamia wątki {@link ClientHandler} i startuje grę.</li>
      * </ol>
      */
     public static void main(String[] args) {
@@ -61,14 +68,16 @@ public final class GameServer {
             Thread t2 = new Thread(h2, "Client-WHITE");
             t2.start();
 
-            // KLUCZOWE: czekamy aż oba handlery będą gotowe wysyłać (żeby nie zgubić WELCOME)
+            // KLUCZOWE: czekamy aż oba handlery będą gotowe wysyłać (żeby nie zgubić
+            // WELCOME)
             boolean r1 = h1.awaitReady(2000);
             boolean r2 = h2.awaitReady(2000);
             if (!r1 || !r2) {
                 System.out.println("WARNING: Some client handlers not ready in time. Starting game anyway.");
             }
 
-            // Start sesji: wysyłka komunikatów startowych (WELCOME/BOARD/TURN/PHASE) i gotowość na komendy
+            // Start sesji: wysyłka komunikatów startowych (WELCOME/BOARD/TURN/PHASE) i
+            // gotowość na komendy
             session.startGame();
             System.out.println("Game started. Waiting for moves...");
 

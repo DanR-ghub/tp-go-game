@@ -14,6 +14,7 @@ import pl.edu.go.game.GameResult;
 import pl.edu.go.game.PlayerColor;
 import pl.edu.go.model.Stone;
 import pl.edu.go.model.StoneGroup;
+import pl.edu.go.persistence.GameStorageService;
 
 
 /**
@@ -66,15 +67,29 @@ public class GameSession implements GameObserver {
     /** Handler klienta WHITE (może być null do czasu połączenia). */
     private ClientHandler whitePlayer;
 
+    // 3.2: jeśli storage != null, sesja zapisuje grę i komendy do DB
+    private final GameStorageService storage;
+    private final long gameId;
+    private long seqNo = 0L;
+
+
     /**
      * Tworzy sesję i rejestruje się jako obserwator gry (Observer).
      *
      * @param game logika gry
      */
     public GameSession(Game game) {
+        this(game, null, 0L);
+    }
+
+    public GameSession(Game game, GameStorageService storage, long gameId) {
         this.game = game;
+        this.storage = storage;
+        this.gameId = gameId;
         this.game.addObserver(this);
     }
+
+
 
     /**
      * Przypisuje handler do koloru gracza w tej sesji.
@@ -140,6 +155,11 @@ public class GameSession implements GameObserver {
         try {
             GameCommand command = commandFactory.fromNetworkMessage(trimmed, from.getColor());
             command.execute(game);
+            // 3.2: zapisujemy tylko zaakceptowane komendy (po execute), bez dublowania reguł gry
+            if (storage != null && gameId > 0) {
+                storage.recordCommand(gameId, ++seqNo, from.getColor(), trimmed);
+            }
+
         } catch (Exception e) {
             from.sendLine("ERROR " + e.getMessage());
             System.out.println("Error for " + from.getColor() + ": " + e.getMessage());
@@ -181,6 +201,11 @@ public class GameSession implements GameObserver {
      */
     @Override
     public void onGameEnded(GameResult result) {
+        // 3.2: domknięcie rekordu gry w DB
+        if (storage != null && gameId > 0) {
+            storage.finishGame(gameId, result);
+        }
+
         String winnerStr = (result.getWinner() == null) ? "NONE" : result.getWinner().name();
         broadcast("END " + winnerStr + " " + result.getReason());
     }
