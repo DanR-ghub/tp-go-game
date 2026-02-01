@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pmd xmlns="http://pmd.sourceforge.net/report/2.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://pmd.sourceforge.net/report/2.0.0 http://pmd.sourceforge.net/report_2_0_0.xsd" version="6.55.0" timestamp="2025-12-17T19:18:09.401">
+<file name="/mnt/c/studia/3sem/informatyka/lab4/2/Go-Game/src/main/java/pl/edu/go/board/Board.java">
+<violation beginline="122" endline="122" begincolumn="20" endcolumn="49" rule="UselessParentheses" ruleset="Code Style" package="pl.edu.go.board" class="Board" method="playMove" externalInfoUrl="https://pmd.github.io/pmd-6.55.0/pmd_rules_java_codestyle.html#uselessparentheses" priority="4">
+Useless parentheses.
+</violation>
+</file>
+<file name="/mnt/c/studia/3sem/informatyka/lab4/2/Go-Game/src/main/java/pl/edu/go/client/cli/CliClient.java">
+<violation beginline="219" endline="219" begincolumn="27" endcolumn="42" rule="UselessParentheses" ruleset="Code Style" package="pl.edu.go.client.cli" class="CliClient" method="displayBoard" externalInfoUrl="https://pmd.github.io/pmd-6.55.0/pmd_rules_java_codestyle.html#uselessparentheses" priority="4">
+Useless parentheses.
+</violation>
+</file>
+</pmd>

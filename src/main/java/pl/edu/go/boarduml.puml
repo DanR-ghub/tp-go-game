@@ -1,0 +1,62 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam dpi 150
+title Diagram klas - Logika gry Go (Osoba A)
+
+package board {
+    class Board {
+        - int size
+        - int[][] board
+        + Board(int size)
+        + boolean placeStone(int x, int y, int color)
+        + int get(int x, int y)
+        + void removeGroup(StoneGroup group)
+        + List<StoneGroup> findCapturedGroups(int x, int y, int color)
+        + List<int[]> neighbors(int x, int y)
+        + int countLiberties(StoneGroup group)
+    }
+
+    class BoardFactory {
+        + Board createDefault19x19()
+        + Board create(int size)
+    }
+}
+
+package model {
+    class Stone {
+        + int x
+        + int y
+        + int color
+    }
+
+    class StoneGroup {
+        + addStone(Stone)
+        + List<Stone> getStones()
+    }
+}
+
+package move {
+    class Move {
+        + int x
+        + int y
+        + int color
+        + Move(int x, int y, int color)
+    }
+
+    class MoveAdapter {
+        + Move fromText(String cmd, int color)
+    }
+
+    class MoveFactory {
+        + Move createMove(int x, int y, int color)
+    }
+}
+
+
+Board --> Stone : uses
+Board --> StoneGroup : creates groups
+StoneGroup --> Stone : contains\n(composite)
+MoveAdapter --> Move : adapts
+MoveFactory --> Move : creates
+
+@enduml

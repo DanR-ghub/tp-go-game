@@ -1,0 +1,301 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam dpi 150
+title Diagram klas - Go-Game (bez GUI) - klient CLI + serwer + logika
+
+' =======================
+'  pl.edu.go.board
+' =======================
+package "pl.edu.go.board" as board {
+
+  class Board {
+    + {static} int EMPTY
+    + {static} int BLACK
+    + {static} int WHITE
+
+    - int size
+    - int[][] board
+
+    + Board(int size)
+    + boolean playMove(int color, int x, int y)
+    + int[][] getState()
+    + String toString()
+
+    - java.util.List<int[]> neighbors(int x, int y)
+    - pl.edu.go.model.StoneGroup getGroup(int x, int y)
+    - int countLiberties(pl.edu.go.model.StoneGroup group)
+    - void removeGroup(pl.edu.go.model.StoneGroup group)
+  }
+
+  class BoardFactory <<Factory Method>> {
+    + {static} Board createBoard(int size)
+  }
+}
+
+' =======================
+'  pl.edu.go.model
+' =======================
+package "pl.edu.go.model" as model {
+
+  class Stone {
+    - int x
+    - int y
+    - int color
+    + Stone(int x, int y, int color)
+    + int getX()
+    + int getY()
+    + int getColor()
+  }
+
+  class StoneGroup {
+    - int color
+    - java.util.Set<Stone> stones
+    + StoneGroup(int color)
+    + void addStone(Stone s)
+    + java.util.Set<Stone> getStones()
+    + int getColor()
+  }
+}
+
+' =======================
+'  pl.edu.go.move
+' =======================
+package "pl.edu.go.move" as move {
+
+  class Move {
+    - int color
+    - int x
+    - int y
+    + Move(int color, int x, int y)
+    + int getColor()
+    + int getX()
+    + int getY()
+  }
+
+  class MoveFactory <<Factory Method>> {
+    + {static} Move createMove(int color, int x, int y)
+  }
+
+  class MoveAdapter <<Adapter>> {
+    + {static} int[] toInternal(String move)
+    + {static} String toExternal(int x, int y)
+  }
+}
+
+' =======================
+'  pl.edu.go.game
+' =======================
+package "pl.edu.go.game" as game {
+
+  interface GameObserver <<Observer>> {
+    + void onBoardChanged(pl.edu.go.board.Board board)
+    + void onGameEnded(GameResult result)
+    + void onPlayerToMoveChanged(PlayerColor player)
+  }
+
+  enum PlayerColor {
+    BLACK
+    WHITE
+    --
+    - int boardColor
+    + int toBoardColor()
+    + PlayerColor opposite()
+    + {static} PlayerColor fromBoardColor(int boardColor)
+  }
+
+  class GameResult {
+    - PlayerColor winner
+    - String reason
+    + GameResult(PlayerColor winner, String reason)
+    + PlayerColor getWinner()
+    + String getReason()
+  }
+
+  class Game {
+    - pl.edu.go.board.Board board
+    - PlayerColor currentPlayer
+    - boolean finished
+    - GameResult result
+    - int consecutivePasses
+    - java.util.List<GameObserver> observers
+
+    + Game(pl.edu.go.board.Board board)
+    + pl.edu.go.board.Board getBoard()
+    + PlayerColor getCurrentPlayer()
+    + boolean isFinished()
+    + GameResult getResult()
+
+    + void addObserver(GameObserver observer)
+    + void removeObserver(GameObserver observer)
+
+    ' Wariant "void + wyjątki" (wg Twoich ostatnich zmian).
+    + void playMove(PlayerColor player, int x, int y)
+    + void pass(PlayerColor player)
+    + void resign(PlayerColor player)
+
+    ' Jeśli masz również przeciążenie dla Move (zalecane przy Move/MoveFactory):
+    + void playMove(pl.edu.go.move.Move move)
+
+    - void notifyBoardChanged()
+    - void notifyPlayerToMoveChanged()
+    - void notifyGameEnded()
+  }
+}
+
+' =======================
+'  pl.edu.go.command
+' =======================
+package "pl.edu.go.command" as command {
+
+  interface GameCommand <<Command>> {
+    + void execute(pl.edu.go.game.Game game)
+  }
+
+  class PlaceStoneCommand <<Command>> {
+    - int x
+    - int y
+    - pl.edu.go.game.PlayerColor player
+    + PlaceStoneCommand(int x, int y, pl.edu.go.game.PlayerColor player)
+    + void execute(pl.edu.go.game.Game game)
+  }
+
+  class PassCommand <<Command>> {
+    - pl.edu.go.game.PlayerColor player
+    + PassCommand(pl.edu.go.game.PlayerColor player)
+    + void execute(pl.edu.go.game.Game game)
+  }
+
+  class ResignCommand <<Command>> {
+    - pl.edu.go.game.PlayerColor player
+    + ResignCommand(pl.edu.go.game.PlayerColor player)
+    + void execute(pl.edu.go.game.Game game)
+  }
+
+  class TextCommandFactory <<Factory Method>> {
+    + GameCommand fromNetworkMessage(String message, pl.edu.go.game.PlayerColor player)
+  }
+}
+
+' =======================
+'  pl.edu.go.server
+' =======================
+package "pl.edu.go.server" as server {
+
+  class GameServer {
+    + {static} void main(String[] args)
+  }
+
+  class ClientHandler <<Runnable>> {
+    - java.net.Socket socket
+    - GameSession session
+    - pl.edu.go.game.PlayerColor color
+    - java.io.PrintWriter out
+
+    + ClientHandler(java.net.Socket socket, GameSession session, pl.edu.go.game.PlayerColor color)
+    + pl.edu.go.game.PlayerColor getColor()
+    + void sendLine(String line)
+    + void run()
+  }
+
+  class GameSession <<Observer>> {
+    - pl.edu.go.game.Game game
+    - pl.edu.go.command.TextCommandFactory commandFactory
+    - ClientHandler blackPlayer
+    - ClientHandler whitePlayer
+
+    + GameSession(pl.edu.go.game.Game game)
+    + synchronized void setPlayer(pl.edu.go.game.PlayerColor color, ClientHandler handler)
+    + synchronized void handleClientMessage(ClientHandler from, String message)
+    + synchronized void startGame()
+    ~ void broadcast(String line)
+
+    + void onBoardChanged(pl.edu.go.board.Board board)
+    + void onGameEnded(pl.edu.go.game.GameResult result)
+    + void onPlayerToMoveChanged(pl.edu.go.game.PlayerColor player)
+  }
+}
+
+' =======================
+'  pl.edu.go.client.cli
+' =======================
+package "pl.edu.go.client.cli" as cli {
+
+  class CliClient {
+    - {static} volatile boolean running
+    + {static} void main(String[] args)
+    - {static} void listenToServer(java.io.BufferedReader in)
+    - {static} void displayBoard(int size, java.util.List<String> rows)
+  }
+}
+
+' =======================
+'  (opcjonalnie) pl.edu.go - MainTest / testy
+' =======================
+package "pl.edu.go" as root {
+  class MainTest {
+    + {static} void main(String[] args)
+  }
+}
+
+' =======================
+'  RELACJE: board/model
+' =======================
+board.Board --> model.Stone : creates/uses
+board.Board --> model.StoneGroup : creates/uses
+model.StoneGroup o-- "0..*" model.Stone : contains (composite)
+board.BoardFactory ..> board.Board : creates
+
+' =======================
+'  RELACJE: move
+' =======================
+move.MoveFactory ..> move.Move : creates
+move.MoveAdapter ..> move.Move : adapts coords (optional use)
+
+' =======================
+'  RELACJE: game
+' =======================
+game.Game --> board.Board : delegates rules
+game.Game o-- "0..*" game.GameObserver : notifies
+game.PlayerColor ..> board.Board : maps Board.BLACK/WHITE
+
+' =======================
+'  RELACJE: command
+' =======================
+command.GameCommand <|.. command.PlaceStoneCommand
+command.GameCommand <|.. command.PassCommand
+command.GameCommand <|.. command.ResignCommand
+
+command.TextCommandFactory ..> command.GameCommand : creates
+command.TextCommandFactory ..> command.PlaceStoneCommand : creates
+command.TextCommandFactory ..> command.PassCommand : creates
+command.TextCommandFactory ..> command.ResignCommand : creates
+
+command.PlaceStoneCommand --> game.Game : execute()
+command.PassCommand --> game.Game : execute()
+command.ResignCommand --> game.Game : execute()
+
+' =======================
+'  RELACJE: server
+' =======================
+server.GameSession ..|> game.GameObserver
+server.GameSession --> game.Game : owns
+server.GameSession --> command.TextCommandFactory : uses
+server.GameSession --> server.ClientHandler : holds players
+
+server.ClientHandler --> server.GameSession : forwards messages
+server.ClientHandler --> game.PlayerColor : assigned color
+
+server.GameServer ..> board.BoardFactory : creates board
+server.GameServer ..> game.Game : creates
+server.GameServer ..> server.GameSession : creates
+server.GameServer ..> server.ClientHandler : creates + threads
+server.GameServer ..> java.net.ServerSocket : opens port 5001
+
+' =======================
+'  RELACJE: client CLI
+' =======================
+cli.CliClient ..> move.MoveAdapter : parses MOVE (B2/B 2)
+root.MainTest ..> board.Board
+root.MainTest ..> move.MoveAdapter
+
+@enduml
